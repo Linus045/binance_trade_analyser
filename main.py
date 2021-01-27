@@ -96,9 +96,9 @@ def getBalanceAsString(ignoreEmpty=True, alsoInEuro=False):
             balance_in_eur = getPriceInEur(Balance[key], key)
             total_in_eur += balance_in_eur
             if alsoInEuro:
-                balance_as_string += ' ( ~' + formatNumber(balance_in_eur,2) + '€) '
+                balance_as_string += ' ( ~' + formatNumber(balance_in_eur,2) + '€'+ ' BTCEUR@' + str(current_prices['BTCEUR'])+'€)'
             balance_as_string += '|\n'
-    balance_as_string += '\n|' + 'TOTAL IN EUR'.ljust(padding) + ': ' + formatNumber(total_in_eur) + '|'
+    balance_as_string += '\n|' + 'TOTAL IN EUR'.ljust(padding) + ': ' + formatNumber(total_in_eur) + '€ BTCEUR@' + str(current_prices['BTCEUR']) + '|'
     return balance_as_string
 
 
