@@ -57,8 +57,8 @@ def getTime(elem):
     return elem['updateTime']
 allOrders.sort(key=getTime)
 
-def formatNumber(amount, precision=8):
-    return "{:>#{width}.{prec}f}".format(amount, width=precision + 5,prec=precision)
+def formatNumber(amount, precision=8, showSign=False):
+    return "{:>{sign}{width}.{prec}f}".format(amount, sign='+' if showSign else '', width=precision + 5,prec=precision)
 
 def addLossGainToBalance(asset, amount, isGain):
     if not asset in Balance:
@@ -86,19 +86,42 @@ def getPriceInEur(amount, asset):
         print('Error: No pricelist for ' + symbol_asset_btc + ' or ' + symbol_btc_asset)
         raise
 
-def getBalanceAsString(ignoreEmpty=True, alsoInEuro=False):
+def getBalanceAsString(old_balance, ignoreEmpty=True, alsoInEuro=False, onlyShowCurrencyThatChanged=False, alsoChangesInEur=True):
     padding = 12
     balance_as_string = ''
+    balance_as_string += 'EUR values calculated with current BTCEUR@' + str(current_prices['BTCEUR'])+'€\n'
     total_in_eur = 0
+    balance_diff = {}
+    keys = ({**old_balance , **Balance} ).keys()
+    for key in keys:
+        old_balance_value = 0
+        balance_value = 0
+        if key in Balance:
+            balance_value = Balance[key]
+        if key in old_balance:
+            old_balance_value = old_balance[key]
+        balance_diff[key] = balance_value - old_balance_value
+    
+    win_loss_in_eur = 0
+    for key in balance_diff:
+        win_loss_in_eur += getPriceInEur(balance_diff[key], key)
+
     for key in Balance:
-        if not ignoreEmpty or ignoreEmpty and Balance[key] != 0:
+        if not onlyShowCurrencyThatChanged or onlyShowCurrencyThatChanged and (balance_diff[key] != 0):
+            if not ignoreEmpty or ignoreEmpty and (Balance[key] != 0 or balance_diff[key] != 0):
             balance_as_string += '|' + key.ljust(padding) + ': ' + formatNumber(Balance[key])
             balance_in_eur = getPriceInEur(Balance[key], key)
             total_in_eur += balance_in_eur
             if alsoInEuro:
-                balance_as_string += ' ( ~' + formatNumber(balance_in_eur,2) + '€'+ ' BTCEUR@' + str(current_prices['BTCEUR'])+'€)'
-            balance_as_string += '|\n'
-    balance_as_string += '\n|' + 'TOTAL IN EUR'.ljust(padding) + ': ' + formatNumber(total_in_eur) + '€ BTCEUR@' + str(current_prices['BTCEUR']) + '|'
+                    balance_as_string += ' (' + formatNumber(balance_in_eur,2) + '€)'
+                balance_as_string += '|'
+                if (key in balance_diff) and (balance_diff[key] != 0):
+                    balance_as_string += formatNumber(balance_diff[key], showSign=True)
+                    if alsoChangesInEur:
+                        balance_as_string += ' (' + formatNumber(getPriceInEur(balance_diff[key], key), precision=2,showSign=True) + '€)'
+                balance_as_string += '\n'
+    balance_as_string += '\n|Gain/Loss in EUR: '.ljust(padding) + formatNumber(win_loss_in_eur, precision=2, showSign=True) + '€|'
+    balance_as_string += '\n|Total in EUR: '.ljust(padding) + formatNumber(total_in_eur, precision=8, showSign=False) + '€|'
     return balance_as_string
 
 
@@ -121,7 +144,7 @@ for order in allOrders:
         price = float(order['price'])
         quantity = float(order['executedQty'])
         quoteQty = float(order['cummulativeQuoteQty'])
-
+        old_balance = Balance.copy()
         if order['side'] == 'BUY':
                 addLossGainToBalance(baseAsset, quantity, True)
                 addLossGainToBalance(quoteAsset, quoteQty, False)
@@ -140,7 +163,7 @@ for order in allOrders:
         text += ' ' + order['side'] + '@' + formatNumber(price, base_digitPrecision) + '  Base Amount traded:' + str(quantity) + ' - '
         text += 'BaseAsset: ' + baseAsset + ' QuoteAsset: ' + quoteAsset
         text += ' (Quote amount received:'+ str(quoteQty) +')' + '\n'
-        text += getBalanceAsString(True, True) + '\n'
+        text += getBalanceAsString(old_balance, True, True, False) + '\n'
         text += '-----------------'+ '\n'
         output_file.write(text);
         print(text)
